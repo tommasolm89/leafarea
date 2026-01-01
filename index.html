@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a472a">
+    <meta name="description" content="App per il calcolo dell'area fogliare con rilevamento automatico dei bordi">
+    <link rel="manifest" href="manifest.json">
+    <title>LeafArea Pro</title>
+    <style>
+        :root {
+            --forest: #1a472a;
+            --forest-light: #2d5a3d;
+            --leaf: #4a7c59;
+            --cream: #f5f2eb;
+            --cream-dark: #e8e4db;
+            --accent: #d4a373;
+            --danger: #c44536;
+            --text: #2c2c2c;
+            --text-light: #666;
+            --radius: 12px;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--cream);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--forest) 0%, var(--forest-light) 100%);
+            color: white;
+            padding: 1rem;
+            padding-top: calc(1rem + var(--safe-top));
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--cream-dark);
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 8px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-light);
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            color: var(--forest);
+            background: var(--cream);
+            border-bottom: 3px solid var(--leaf);
+        }
+
+        .main {
+            padding: 1rem;
+            padding-bottom: calc(1rem + var(--safe-bottom));
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .input-group {
+            flex: 1;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 4px;
+        }
+
+        .input-group input[type="number"],
+        .input-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--cream-dark);
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--leaf);
+        }
+
+        /* Upload buttons */
+        .upload-options {
+            display: flex;
+            gap: 10px;
+        }
+
+        .upload-btn {
+            flex: 1;
+            padding: 16px 12px;
+            border: 2px dashed var(--leaf);
+            border-radius: var(--radius);
+            background: linear-gradient(135deg, rgba(74, 124, 89, 0.05) 0%, rgba(107, 155, 122, 0.1) 100%);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .upload-btn:active {
+            background: rgba(74, 124, 89, 0.2);
+            transform: scale(0.98);
+        }
+
+        .upload-btn-icon {
+            font-size: 32px;
+            margin-bottom: 6px;
+        }
+
+        .upload-btn-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--forest);
+        }
+
+        .upload-btn input {
+            display: none;
+        }
+
+        /* Preview area */
+        .preview-area {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .preview-area.visible {
+            display: block;
+        }
+
+        .preview-container {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: #000;
+        }
+
+        .preview-img {
+            width: 100%;
+            display: block;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .preview-actions .btn {
+            flex: 1;
+        }
+
+        /* Scanner Modal */
+        .scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        .scanner-modal.active {
+            display: flex;
+        }
+
+        .scanner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            padding-top: calc(12px + var(--safe-top));
+            background: rgba(0,0,0,0.8);
+            color: white;
+        }
+
+        .scanner-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .scanner-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .scanner-view {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scanner-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .scanner-hint {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .scanner-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            padding-bottom: calc(20px + var(--safe-bottom));
+            background: rgba(0,0,0,0.8);
+            gap: 30px;
+        }
+
+        .scanner-capture {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 4px solid white;
+            background: var(--accent);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .scanner-capture::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+
+        .scanner-capture:active {
+            transform: scale(0.95);
+        }
+
+        .scanner-flash {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .scanner-flash.on {
+            background: var(--accent);
+            color: var(--forest);
+        }
+
+        /* Crop/Adjust Modal */
+        .crop-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1001;
+            flex-direction: column;
+        }
+
+        .crop-modal.active {
+            display: flex;
+        }
+
+        .crop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            padding-top: calc(12px + var(--safe-top));
+            background: rgba(0,0,0,0.9);
+            color: white;
+        }
+
+        .crop-view {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .crop-image {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .crop-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .crop-controls {
+            display: flex;
+            gap: 10px;
+            padding: 16px;
+            padding-bottom: calc(16px + var(--safe-bottom));
+            background: rgba(0,0,0,0.9);
+        }
+
+        .crop-controls .btn {
+            flex: 1;
+        }
+
+        /* Corner handles */
+        .corner-handle {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: var(--accent);
+            border: 3px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: move;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        /* Buttons */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--leaf) 0%, var(--forest-light) 100%);
+            color: white;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+        }
+
+        .btn-secondary {
+            background: var(--cream-dark);
+            color: var(--text);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        /* Results */
+        .result-box {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .result-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--forest);
+            font-family: monospace;
+        }
+
+        .result-unit {
+            font-size: 18px;
+            color: var(--text-light);
+        }
+
+        .result-meta {
+            margin-top: 12px;
+            font-size: 14px;
+            color: var(--text-light);
+        }
+
+        .mask-img {
+            width: 100%;
+            margin-top: 12px;
+            border-radius: 8px;
+        }
+
+        /* Sliders */
+        .slider-group {
+            margin-bottom: 12px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .slider-label span:last-child {
+            font-family: monospace;
+            color: var(--forest);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--cream-dark);
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--forest);
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .color-boxes {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .color-box {
+            flex: 1;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* History */
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .history-thumb {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: var(--cream-dark);
+        }
+
+        .history-info { flex: 1; }
+        .history-id { font-weight: 600; color: var(--forest); }
+        .history-area { font-family: monospace; font-size: 15px; }
+        .history-date { font-size: 11px; color: var(--text-light); }
+
+        .history-del {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--cream);
+            border-radius: 50%;
+            color: var(--danger);
+            font-size: 20px;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .export-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .export-row .btn { flex: 1; }
+
+        .hidden { display: none !important; }
+
+        /* Loading */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: calc(20px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--forest);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 3000;
+            transition: transform 0.3s;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🌿 LeafArea Pro</h1>
+        <div id="opencv-status" style="font-size:11px; margin-top:4px; opacity:0.8;">
+            ⏳ Caricamento OpenCV...
+        </div>
+    </header>
+
+    <nav class="tabs">
+        <button type="button" class="tab active" id="tab-measure">📐 Misura</button>
+        <button type="button" class="tab" id="tab-calibrate">🎨 Calibra</button>
+        <button type="button" class="tab" id="tab-history">📋 Storico</button>
+    </nav>
+
+    <main class="main">
+        <!-- MISURA -->
+        <section id="panel-measure" class="panel active">
+            <div class="card">
+                <div class="card-title">📏 Dimensioni superficie (cm)</div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Larghezza</label>
+                        <input type="number" id="inp-width" value="100" inputmode="decimal">
+                    </div>
+                    <div class="input-group">
+                        <label>Altezza</label>
+                        <input type="number" id="inp-height" value="140" inputmode="decimal">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>ID campione</label>
+                    <input type="text" id="inp-id" placeholder="es. Lattuga_T1_R1">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📷 Immagine</div>
+                <div class="upload-options">
+                    <label class="upload-btn" id="btn-camera">
+                        <input type="file" id="inp-camera" accept="image/*" capture="environment" style="display:none">
+                        <div class="upload-btn-icon">📷</div>
+                        <div class="upload-btn-text">Fotocamera</div>
+                    </label>
+                    <label class="upload-btn">
+                        <input type="file" id="inp-gallery" accept="image/*">
+                        <div class="upload-btn-icon">🖼️</div>
+                        <div class="upload-btn-text">Galleria</div>
+                    </label>
+                </div>
+                <p style="font-size:11px; color:#888; margin-top:8px; text-align:center;">
+                    💡 Per lo scanner avanzato, apri il file da Chrome (non da WhatsApp/Telegram)
+                </p>
+                
+                <div class="preview-area" id="preview-area">
+                    <div class="preview-container">
+                        <img class="preview-img" id="preview-img" alt="Preview">
+                    </div>
+                    <div class="preview-actions">
+                        <button type="button" class="btn btn-secondary" id="btn-clear-img">🗑️ Rimuovi</button>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="btn-analyze" disabled>
+                🔬 Analizza area fogliare
+            </button>
+
+            <div class="card hidden" id="result-card">
+                <div class="card-title">📊 Risultato</div>
+                <div class="result-box">
+                    <div class="result-value" id="res-value">0,00</div>
+                    <div class="result-unit">cm²</div>
+                    <div class="result-meta">
+                        <span id="res-id"></span> • <span id="res-percent"></span>% copertura
+                    </div>
+                </div>
+                <img id="res-mask" class="mask-img hidden" alt="Maschera">
+                <button type="button" class="btn btn-secondary" id="btn-save-result" style="margin-top:12px">💾 Salva nello storico</button>
+            </div>
+        </section>
+
+        <!-- CALIBRA -->
+        <section id="panel-calibrate" class="panel">
+            <div class="card">
+                <div class="card-title">🎯 Immagine di riferimento</div>
+                <label class="upload-btn" style="display:block">
+                    <input type="file" id="calib-file-input" accept="image/*">
+                    <div class="upload-btn-icon">🖼️</div>
+                    <div class="upload-btn-text">Tocca per caricare</div>
+                </label>
+                <div class="preview-area" id="calib-preview-area">
+                    <div class="preview-container">
+                        <img class="preview-img" id="calib-preview" alt="Preview">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🎨 Soglie HSV</div>
+                <div class="color-boxes">
+                    <div class="color-box" id="box-lower">LOWER</div>
+                    <div class="color-box" id="box-upper">UPPER</div>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label"><span>Lower H</span><span id="val-lh">140</span></div>
+                    <input type="range" id="sl-lh" min="0" max="179" value="140">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Lower S</span><span id="val-ls">60</span></div>
+                    <input type="range" id="sl-ls" min="0" max="255" value="60">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Lower V</span><span id="val-lv">60</span></div>
+                    <input type="range" id="sl-lv" min="0" max="255" value="60">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Upper H</span><span id="val-uh">179</span></div>
+                    <input type="range" id="sl-uh" min="0" max="179" value="179">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Upper S</span><span id="val-us">255</span></div>
+                    <input type="range" id="sl-us" min="0" max="255" value="255">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span>Upper V</span><span id="val-uv">255</span></div>
+                    <input type="range" id="sl-uv" min="0" max="255" value="255">
+                </div>
+            </div>
+
+            <div class="card hidden" id="calib-mask-card">
+                <div class="card-title">👁️ Anteprima maschera</div>
+                <img id="calib-mask" class="mask-img" alt="Maschera">
+            </div>
+
+            <button type="button" class="btn btn-primary" id="btn-save-calib">💾 Salva calibrazione</button>
+        </section>
+
+        <!-- STORICO -->
+        <section id="panel-history" class="panel">
+            <div id="history-list"></div>
+            <div class="export-row hidden" id="export-row">
+                <button type="button" class="btn btn-secondary" id="btn-export">📄 Esporta CSV</button>
+                <button type="button" class="btn btn-danger" id="btn-clear">🗑️ Elimina tutto</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Scanner Modal -->
+    <div class="scanner-modal" id="scanner-modal">
+        <div class="scanner-header">
+            <span class="scanner-title">📷 Scansiona foglio</span>
+            <button type="button" class="scanner-close" id="scanner-close">✕</button>
+        </div>
+        <div class="scanner-view">
+            <video class="scanner-video" id="scanner-video" playsinline autoplay muted></video>
+            <canvas class="scanner-canvas" id="scanner-canvas"></canvas>
+            <div class="scanner-hint" id="scanner-hint">Inquadra il foglio con le foglie</div>
+        </div>
+        <div class="scanner-controls">
+            <button type="button" class="scanner-flash" id="scanner-flash">⚡</button>
+            <button type="button" class="scanner-capture" id="scanner-capture"></button>
+            <div style="width:44px"></div>
+        </div>
+    </div>
+
+    <!-- Crop Modal -->
+    <div class="crop-modal" id="crop-modal">
+        <div class="crop-header">
+            <button type="button" class="btn btn-outline" id="crop-back" style="width:auto;padding:8px 16px">← Indietro</button>
+            <span class="scanner-title">Regola i bordi</span>
+            <div style="width:80px"></div>
+        </div>
+        <div class="crop-view" id="crop-view">
+            <img class="crop-image" id="crop-image" alt="Crop">
+            <canvas class="crop-canvas" id="crop-canvas"></canvas>
+            <div class="corner-handle" id="handle-tl" data-corner="tl"></div>
+            <div class="corner-handle" id="handle-tr" data-corner="tr"></div>
+            <div class="corner-handle" id="handle-bl" data-corner="bl"></div>
+            <div class="corner-handle" id="handle-br" data-corner="br"></div>
+        </div>
+        <div class="crop-controls">
+            <button type="button" class="btn btn-secondary" id="crop-auto">🔄 Auto-rileva</button>
+            <button type="button" class="btn btn-primary" id="crop-confirm">✓ Applica</button>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Hidden canvas -->
+    <canvas id="cv" style="display:none"></canvas>
+    <canvas id="cv2" style="display:none"></canvas>
+
+    <!-- OpenCV.js -->
+    <script>
+    function onOpenCVReady() {
+        cvReady = true;
+        console.log('OpenCV.js ready');
+        document.getElementById('opencv-status').innerHTML = '✅ Scanner pronto';
+        document.getElementById('opencv-status').style.color = '#90EE90';
+    }
+    function onOpenCVError() {
+        console.error('OpenCV.js failed to load');
+        document.getElementById('opencv-status').innerHTML = '⚠️ Scanner non disponibile';
+        document.getElementById('opencv-status').style.color = '#FFD700';
+    }
+    </script>
+    <script async src="https://docs.opencv.org/4.5.5/opencv.js" onload="onOpenCVReady()" onerror="onOpenCVError()"></script>
+
+    <script>
+    // ========== GLOBALS ==========
+    var currentImg = null;
+    var calibImg = null;
+    var lastResult = null;
+    var cvReady = false;
+    var videoStream = null;
+    var flashOn = false;
+
+    // Corners for perspective transform (in image coordinates)
+    var corners = {
+        tl: {x: 0, y: 0},
+        tr: {x: 0, y: 0},
+        bl: {x: 0, y: 0},
+        br: {x: 0, y: 0}
+    };
+
+    var capturedImage = null;
+    var imageDisplayRect = null;
+
+    var hsv = {
+        lh: 140, ls: 60, lv: 60,
+        uh: 179, us: 255, uv: 255
+    };
+
+    var cv_canvas = document.getElementById('cv');
+    var cv_ctx = cv_canvas.getContext('2d');
+    var cv2_canvas = document.getElementById('cv2');
+    var cv2_ctx = cv2_canvas.getContext('2d');
+
+    // ========== OPENCV STATUS ==========
+    // Timeout se OpenCV non si carica
+    setTimeout(function() {
+        if (!cvReady) {
+            document.getElementById('opencv-status').innerHTML = '⚠️ Scanner non disponibile (modalità base)';
+            document.getElementById('opencv-status').style.color = '#FFD700';
+        }
+    }, 15000); // 15 secondi di timeout
+
+    // ========== UTILS ==========
+    function showLoading(show) {
+        document.getElementById('loading').classList.toggle('active', show);
+    }
+
+    function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 2500);
+    }
+
+    // ========== TABS ==========
+    function showTab(name) {
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.remove('active');
+        });
+        document.getElementById('panel-' + name).classList.add('active');
+        
+        document.querySelectorAll('.tab').forEach(function(t) {
+            t.classList.remove('active');
+        });
+        document.getElementById('tab-' + name).classList.add('active');
+
+        if (name === 'history') renderHistory();
+    }
+
+    // ========== SCANNER ==========
+    function openScanner() {
+        // Verifica se siamo in un contesto sicuro
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showToast('📷 Usa il pulsante Fotocamera per scattare');
+            document.getElementById('inp-camera').click();
+            return;
+        }
+        
+        var modal = document.getElementById('scanner-modal');
+        modal.classList.add('active');
+        
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        }).then(function(stream) {
+            videoStream = stream;
+            var video = document.getElementById('scanner-video');
+            video.srcObject = stream;
+            video.play();
+            
+            // Start detection loop
+            requestAnimationFrame(detectDocument);
+        }).catch(function(err) {
+            console.error('Camera error:', err);
+            closeScanner();
+            
+            // Messaggio specifico per il tipo di errore
+            if (err.name === 'NotAllowedError') {
+                showToast('⚠️ Permesso fotocamera negato');
+            } else if (err.name === 'NotFoundError') {
+                showToast('⚠️ Nessuna fotocamera trovata');
+            } else {
+                showToast('📷 Usa Fotocamera per scattare');
+            }
+            
+            // Fallback all'input file
+            setTimeout(function() {
+                document.getElementById('inp-camera').click();
+            }, 500);
+        });
+    }
+
+    function closeScanner() {
+        var modal = document.getElementById('scanner-modal');
+        modal.classList.remove('active');
+        
+        if (videoStream) {
+            videoStream.getTracks().forEach(function(track) {
+                track.stop();
+            });
+            videoStream = null;
+        }
+    }
+
+    function toggleFlash() {
+        if (!videoStream) return;
+        
+        var track = videoStream.getVideoTracks()[0];
+        var capabilities = track.getCapabilities();
+        
+        if (capabilities.torch) {
+            flashOn = !flashOn;
+            track.applyConstraints({ advanced: [{ torch: flashOn }] });
+            document.getElementById('scanner-flash').classList.toggle('on', flashOn);
+        } else {
+            showToast('Flash non disponibile');
+        }
+    }
+
+    // Document detection loop
+    function detectDocument() {
+        if (!document.getElementById('scanner-modal').classList.contains('active')) return;
+        if (!cvReady) {
+            requestAnimationFrame(detectDocument);
+            return;
+        }
+        
+        var video = document.getElementById('scanner-video');
+        var canvas = document.getElementById('scanner-canvas');
+        var ctx = canvas.getContext('2d');
+        
+        if (video.videoWidth === 0) {
+            requestAnimationFrame(detectDocument);
+            return;
+        }
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        ctx.drawImage(video, 0, 0);
+        
+        try {
+            var contour = findDocumentContour(canvas);
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (contour && contour.length === 4) {
+                // Draw detected quadrilateral
+                ctx.beginPath();
+                ctx.moveTo(contour[0].x, contour[0].y);
+                ctx.lineTo(contour[1].x, contour[1].y);
+                ctx.lineTo(contour[2].x, contour[2].y);
+                ctx.lineTo(contour[3].x, contour[3].y);
+                ctx.closePath();
+                
+                ctx.strokeStyle = '#FFA500';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                
+                ctx.fillStyle = 'rgba(255, 165, 0, 0.1)';
+                ctx.fill();
+                
+                // Draw corner circles
+                ctx.fillStyle = '#FFA500';
+                for (var i = 0; i < 4; i++) {
+                    ctx.beginPath();
+                    ctx.arc(contour[i].x, contour[i].y, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                document.getElementById('scanner-hint').textContent = '✓ Foglio rilevato - Tocca per catturare';
+            } else {
+                document.getElementById('scanner-hint').textContent = 'Inquadra il foglio con le foglie';
+            }
+        } catch (e) {
+            console.error('Detection error:', e);
+        }
+        
+        requestAnimationFrame(detectDocument);
+    }
+
+    function findDocumentContour(canvas) {
+        if (!cvReady || !cv) return null;
+        
+        try {
+            var src = cv.imread(canvas);
+            var gray = new cv.Mat();
+            var blurred = new cv.Mat();
+            var edges = new cv.Mat();
+            var contours = new cv.MatVector();
+            var hierarchy = new cv.Mat();
+            
+            // Convert to grayscale
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+            
+            // Blur
+            cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+            
+            // Edge detection
+            cv.Canny(blurred, edges, 50, 150);
+            
+            // Dilate to close gaps
+            var kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+            cv.dilate(edges, edges, kernel);
+            
+            // Find contours
+            cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            
+            var bestContour = null;
+            var maxArea = canvas.width * canvas.height * 0.1; // Min 10% of image
+            
+            for (var i = 0; i < contours.size(); i++) {
+                var cnt = contours.get(i);
+                var area = cv.contourArea(cnt);
+                
+                if (area > maxArea) {
+                    var peri = cv.arcLength(cnt, true);
+                    var approx = new cv.Mat();
+                    cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                    
+                    if (approx.rows === 4) {
+                        maxArea = area;
+                        bestContour = [];
+                        for (var j = 0; j < 4; j++) {
+                            bestContour.push({
+                                x: approx.data32S[j * 2],
+                                y: approx.data32S[j * 2 + 1]
+                            });
+                        }
+                    }
+                    approx.delete();
+                }
+                cnt.delete();
+            }
+            
+            // Sort corners: TL, TR, BR, BL
+            if (bestContour) {
+                bestContour = sortCorners(bestContour);
+            }
+            
+            // Cleanup
+            src.delete();
+            gray.delete();
+            blurred.delete();
+            edges.delete();
+            contours.delete();
+            hierarchy.delete();
+            kernel.delete();
+            
+            return bestContour;
+        } catch (e) {
+            console.error('OpenCV error:', e);
+            return null;
+        }
+    }
+
+    function sortCorners(pts) {
+        // Sort by Y first
+        pts.sort(function(a, b) { return a.y - b.y; });
+        
+        // Top two and bottom two
+        var top = pts.slice(0, 2);
+        var bottom = pts.slice(2, 4);
+        
+        // Sort each pair by X
+        top.sort(function(a, b) { return a.x - b.x; });
+        bottom.sort(function(a, b) { return a.x - b.x; });
+        
+        return [top[0], top[1], bottom[1], bottom[0]]; // TL, TR, BR, BL
+    }
+
+    function captureImage() {
+        var video = document.getElementById('scanner-video');
+        
+        cv_canvas.width = video.videoWidth;
+        cv_canvas.height = video.videoHeight;
+        cv_ctx.drawImage(video, 0, 0);
+        
+        capturedImage = new Image();
+        capturedImage.onload = function() {
+            closeScanner();
+            openCropModal();
+        };
+        capturedImage.src = cv_canvas.toDataURL('image/jpeg', 0.95);
+    }
+
+    // ========== CROP MODAL ==========
+    function openCropModal() {
+        var modal = document.getElementById('crop-modal');
+        modal.classList.add('active');
+        
+        var img = document.getElementById('crop-image');
+        img.src = capturedImage.src;
+        
+        img.onload = function() {
+            // Calculate display rect
+            var view = document.getElementById('crop-view');
+            var viewRect = view.getBoundingClientRect();
+            
+            var scale = Math.min(
+                viewRect.width / img.naturalWidth,
+                viewRect.height / img.naturalHeight
+            );
+            
+            var displayWidth = img.naturalWidth * scale;
+            var displayHeight = img.naturalHeight * scale;
+            var offsetX = (viewRect.width - displayWidth) / 2;
+            var offsetY = (viewRect.height - displayHeight) / 2;
+            
+            imageDisplayRect = {
+                x: offsetX,
+                y: offsetY,
+                width: displayWidth,
+                height: displayHeight,
+                scale: scale
+            };
+            
+            // Try auto-detect, or default to full image
+            autoDetectCorners();
+            updateCropOverlay();
+        };
+    }
+
+    function closeCropModal() {
+        document.getElementById('crop-modal').classList.remove('active');
+    }
+
+    function autoDetectCorners() {
+        var img = document.getElementById('crop-image');
+        
+        cv_canvas.width = img.naturalWidth;
+        cv_canvas.height = img.naturalHeight;
+        cv_ctx.drawImage(img, 0, 0);
+        
+        var detected = findDocumentContour(cv_canvas);
+        
+        if (detected && detected.length === 4) {
+            corners.tl = detected[0];
+            corners.tr = detected[1];
+            corners.br = detected[2];
+            corners.bl = detected[3];
+            showToast('✓ Bordi rilevati');
+        } else {
+            // Default to full image
+            corners.tl = {x: 50, y: 50};
+            corners.tr = {x: img.naturalWidth - 50, y: 50};
+            corners.br = {x: img.naturalWidth - 50, y: img.naturalHeight - 50};
+            corners.bl = {x: 50, y: img.naturalHeight - 50};
+            showToast('Regola manualmente i bordi');
+        }
+        
+        updateCropOverlay();
+    }
+
+    function updateCropOverlay() {
+        var canvas = document.getElementById('crop-canvas');
+        var ctx = canvas.getContext('2d');
+        var view = document.getElementById('crop-view');
+        var viewRect = view.getBoundingClientRect();
+        
+        canvas.width = viewRect.width;
+        canvas.height = viewRect.height;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Clear the selected area
+        var r = imageDisplayRect;
+        var scale = r.scale;
+        
+        var pts = [
+            {x: r.x + corners.tl.x * scale, y: r.y + corners.tl.y * scale},
+            {x: r.x + corners.tr.x * scale, y: r.y + corners.tr.y * scale},
+            {x: r.x + corners.br.x * scale, y: r.y + corners.br.y * scale},
+            {x: r.x + corners.bl.x * scale, y: r.y + corners.bl.y * scale}
+        ];
+        
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.lineTo(pts[2].x, pts[2].y);
+        ctx.lineTo(pts[3].x, pts[3].y);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.globalCompositeOperation = 'source-over';
+        
+        // Draw border
+        ctx.strokeStyle = '#FFA500';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.lineTo(pts[2].x, pts[2].y);
+        ctx.lineTo(pts[3].x, pts[3].y);
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Position handles
+        positionHandle('handle-tl', pts[0]);
+        positionHandle('handle-tr', pts[1]);
+        positionHandle('handle-br', pts[2]);
+        positionHandle('handle-bl', pts[3]);
+    }
+
+    function positionHandle(id, pt) {
+        var h = document.getElementById(id);
+        h.style.left = pt.x + 'px';
+        h.style.top = pt.y + 'px';
+    }
+
+    // Draggable corners
+    function setupCornerDrag() {
+        var handles = document.querySelectorAll('.corner-handle');
+        
+        handles.forEach(function(handle) {
+            var cornerKey = handle.dataset.corner;
+            var isDragging = false;
+            
+            function onStart(e) {
+                e.preventDefault();
+                isDragging = true;
+                handle.style.transform = 'translate(-50%, -50%) scale(1.3)';
+            }
+            
+            function onMove(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                
+                var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                var view = document.getElementById('crop-view');
+                var viewRect = view.getBoundingClientRect();
+                var r = imageDisplayRect;
+                
+                // Convert to image coordinates
+                var imgX = (clientX - viewRect.left - r.x) / r.scale;
+                var imgY = (clientY - viewRect.top - r.y) / r.scale;
+                
+                // Clamp
+                var img = document.getElementById('crop-image');
+                imgX = Math.max(0, Math.min(img.naturalWidth, imgX));
+                imgY = Math.max(0, Math.min(img.naturalHeight, imgY));
+                
+                corners[cornerKey] = {x: imgX, y: imgY};
+                updateCropOverlay();
+            }
+            
+            function onEnd() {
+                isDragging = false;
+                handle.style.transform = 'translate(-50%, -50%) scale(1)';
+            }
+            
+            handle.addEventListener('mousedown', onStart);
+            handle.addEventListener('touchstart', onStart, {passive: false});
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('touchmove', onMove, {passive: false});
+            document.addEventListener('mouseup', onEnd);
+            document.addEventListener('touchend', onEnd);
+        });
+    }
+
+    function applyPerspectiveTransform() {
+        showLoading(true);
+        
+        setTimeout(function() {
+            try {
+                if (!cvReady) {
+                    showToast('OpenCV non pronto');
+                    showLoading(false);
+                    return;
+                }
+                
+                var img = document.getElementById('crop-image');
+                
+                cv_canvas.width = img.naturalWidth;
+                cv_canvas.height = img.naturalHeight;
+                cv_ctx.drawImage(img, 0, 0);
+                
+                var src = cv.imread(cv_canvas);
+                
+                // Calculate output size based on corners
+                var widthTop = Math.sqrt(Math.pow(corners.tr.x - corners.tl.x, 2) + Math.pow(corners.tr.y - corners.tl.y, 2));
+                var widthBottom = Math.sqrt(Math.pow(corners.br.x - corners.bl.x, 2) + Math.pow(corners.br.y - corners.bl.y, 2));
+                var heightLeft = Math.sqrt(Math.pow(corners.bl.x - corners.tl.x, 2) + Math.pow(corners.bl.y - corners.tl.y, 2));
+                var heightRight = Math.sqrt(Math.pow(corners.br.x - corners.tr.x, 2) + Math.pow(corners.br.y - corners.tr.y, 2));
+                
+                var maxWidth = Math.max(widthTop, widthBottom);
+                var maxHeight = Math.max(heightLeft, heightRight);
+                
+                // Source points
+                var srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                    corners.tl.x, corners.tl.y,
+                    corners.tr.x, corners.tr.y,
+                    corners.br.x, corners.br.y,
+                    corners.bl.x, corners.bl.y
+                ]);
+                
+                // Destination points
+                var dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                    0, 0,
+                    maxWidth, 0,
+                    maxWidth, maxHeight,
+                    0, maxHeight
+                ]);
+                
+                var M = cv.getPerspectiveTransform(srcPts, dstPts);
+                var dst = new cv.Mat();
+                var dsize = new cv.Size(maxWidth, maxHeight);
+                
+                cv.warpPerspective(src, dst, M, dsize);
+                
+                // Output to canvas
+                cv2_canvas.width = maxWidth;
+                cv2_canvas.height = maxHeight;
+                cv.imshow(cv2_canvas, dst);
+                
+                // Create final image
+                currentImg = new Image();
+                currentImg.onload = function() {
+                    document.getElementById('preview-img').src = currentImg.src;
+                    document.getElementById('preview-area').classList.add('visible');
+                    document.getElementById('btn-analyze').disabled = false;
+                    
+                    closeCropModal();
+                    showLoading(false);
+                    showToast('✓ Immagine elaborata');
+                };
+                currentImg.src = cv2_canvas.toDataURL('image/jpeg', 0.95);
+                
+                // Cleanup
+                src.delete();
+                dst.delete();
+                srcPts.delete();
+                dstPts.delete();
+                M.delete();
+                
+            } catch (e) {
+                console.error('Transform error:', e);
+                showToast('❌ Errore elaborazione');
+                showLoading(false);
+            }
+        }, 100);
+    }
+
+    // ========== GALLERY ==========
+    function loadFromGallery(file) {
+        if (!file) return;
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            currentImg = new Image();
+            currentImg.onload = function() {
+                document.getElementById('preview-img').src = currentImg.src;
+                document.getElementById('preview-area').classList.add('visible');
+                document.getElementById('btn-analyze').disabled = false;
+            };
+            currentImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function loadFromGalleryWithCrop(file) {
+        if (!file) return;
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            capturedImage = new Image();
+            capturedImage.onload = function() {
+                // Se OpenCV è pronto, apri il crop modal
+                if (cvReady) {
+                    openCropModal();
+                } else {
+                    // Altrimenti carica direttamente
+                    currentImg = capturedImage;
+                    document.getElementById('preview-img').src = currentImg.src;
+                    document.getElementById('preview-area').classList.add('visible');
+                    document.getElementById('btn-analyze').disabled = false;
+                    showToast('⚠️ Scanner non disponibile, immagine caricata direttamente');
+                }
+            };
+            capturedImage.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearImage() {
+        currentImg = null;
+        document.getElementById('preview-area').classList.remove('visible');
+        document.getElementById('btn-analyze').disabled = true;
+        document.getElementById('result-card').classList.add('hidden');
+        document.getElementById('inp-gallery').value = '';
+    }
+
+    // ========== HSV FUNCTIONS ==========
+    function rgbToHsv(r, g, b) {
+        r /= 255; g /= 255; b /= 255;
+        var max = Math.max(r, g, b);
+        var min = Math.min(r, g, b);
+        var d = max - min;
+        var h, s, v = max;
+        
+        s = max === 0 ? 0 : d / max;
+        
+        if (max === min) {
+            h = 0;
+        } else if (max === r) {
+            h = (g - b) / d + (g < b ? 6 : 0);
+        } else if (max === g) {
+            h = (b - r) / d + 2;
+        } else {
+            h = (r - g) / d + 4;
+        }
+        h /= 6;
+        
+        return {
+            h: Math.round(h * 179),
+            s: Math.round(s * 255),
+            v: Math.round(v * 255)
+        };
+    }
+
+    function hsvToRgb(h, s, v) {
+        h = h * 2;
+        s = s / 255;
+        v = v / 255;
+        
+        var c = v * s;
+        var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        var m = v - c;
+        var r, g, b;
+        
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
+    }
+
+    function syncSliders() {
+        document.getElementById('sl-lh').value = hsv.lh;
+        document.getElementById('sl-ls').value = hsv.ls;
+        document.getElementById('sl-lv').value = hsv.lv;
+        document.getElementById('sl-uh').value = hsv.uh;
+        document.getElementById('sl-us').value = hsv.us;
+        document.getElementById('sl-uv').value = hsv.uv;
+    }
+
+    function updateHSV() {
+        hsv.lh = parseInt(document.getElementById('sl-lh').value);
+        hsv.ls = parseInt(document.getElementById('sl-ls').value);
+        hsv.lv = parseInt(document.getElementById('sl-lv').value);
+        hsv.uh = parseInt(document.getElementById('sl-uh').value);
+        hsv.us = parseInt(document.getElementById('sl-us').value);
+        hsv.uv = parseInt(document.getElementById('sl-uv').value);
+        
+        document.getElementById('val-lh').textContent = hsv.lh;
+        document.getElementById('val-ls').textContent = hsv.ls;
+        document.getElementById('val-lv').textContent = hsv.lv;
+        document.getElementById('val-uh').textContent = hsv.uh;
+        document.getElementById('val-us').textContent = hsv.us;
+        document.getElementById('val-uv').textContent = hsv.uv;
+        
+        var lRgb = hsvToRgb(hsv.lh, hsv.ls, hsv.lv);
+        var uRgb = hsvToRgb(hsv.uh, hsv.us, hsv.uv);
+        document.getElementById('box-lower').style.background = 'rgb(' + lRgb.r + ',' + lRgb.g + ',' + lRgb.b + ')';
+        document.getElementById('box-upper').style.background = 'rgb(' + uRgb.r + ',' + uRgb.g + ',' + uRgb.b + ')';
+        
+        updateCalibPreview();
+    }
+
+    function updateCalibPreview() {
+        if (!calibImg) return;
+        
+        var maxDim = 600;
+        var w = calibImg.width;
+        var h = calibImg.height;
+        if (w > maxDim || h > maxDim) {
+            var scale = maxDim / Math.max(w, h);
+            w = Math.floor(w * scale);
+            h = Math.floor(h * scale);
+        }
+        
+        cv_canvas.width = w;
+        cv_canvas.height = h;
+        cv_ctx.drawImage(calibImg, 0, 0, w, h);
+        
+        var imgData = cv_ctx.getImageData(0, 0, w, h);
+        var data = imgData.data;
+        
+        for (var i = 0; i < data.length; i += 4) {
+            var pHsv = rgbToHsv(data[i], data[i+1], data[i+2]);
+            var isBg = pHsv.h >= hsv.lh && pHsv.h <= hsv.uh &&
+                       pHsv.s >= hsv.ls && pHsv.s <= hsv.us &&
+                       pHsv.v >= hsv.lv && pHsv.v <= hsv.uv;
+            var val = isBg ? 0 : 255;
+            data[i] = data[i+1] = data[i+2] = val;
+        }
+        
+        cv_ctx.putImageData(imgData, 0, 0);
+        
+        document.getElementById('calib-mask').src = cv_canvas.toDataURL('image/jpeg', 0.8);
+        document.getElementById('calib-mask-card').classList.remove('hidden');
+    }
+
+    // ========== ANALYZE ==========
+    function analyzeImage() {
+        if (!currentImg) return;
+        
+        showLoading(true);
+        
+        setTimeout(function() {
+            var widthCm = parseFloat(document.getElementById('inp-width').value) || 100;
+            var heightCm = parseFloat(document.getElementById('inp-height').value) || 140;
+            var sampleId = document.getElementById('inp-id').value || ('Campione_' + Date.now());
+            
+            cv_canvas.width = currentImg.width;
+            cv_canvas.height = currentImg.height;
+            cv_ctx.drawImage(currentImg, 0, 0);
+            
+            var imgData = cv_ctx.getImageData(0, 0, cv_canvas.width, cv_canvas.height);
+            var data = imgData.data;
+            var totalPx = data.length / 4;
+            var leafPx = 0;
+            
+            for (var i = 0; i < data.length; i += 4) {
+                var pHsv = rgbToHsv(data[i], data[i+1], data[i+2]);
+                var isBg = pHsv.h >= hsv.lh && pHsv.h <= hsv.uh &&
+                           pHsv.s >= hsv.ls && pHsv.s <= hsv.us &&
+                           pHsv.v >= hsv.lv && pHsv.v <= hsv.uv;
+                
+                if (!isBg) {
+                    leafPx++;
+                    data[i] = data[i+1] = data[i+2] = 255;
+                } else {
+                    data[i] = data[i+1] = data[i+2] = 0;
+                }
+            }
+            
+            cv_ctx.putImageData(imgData, 0, 0);
+            
+            var totalArea = widthCm * heightCm;
+            var leafArea = (leafPx / totalPx) * totalArea;
+            var coverage = (leafPx / totalPx) * 100;
+            
+            document.getElementById('res-value').textContent = leafArea.toFixed(2).replace('.', ',');
+            document.getElementById('res-id').textContent = sampleId;
+            document.getElementById('res-percent').textContent = coverage.toFixed(1).replace('.', ',');
+            
+            var maskImg = document.getElementById('res-mask');
+            maskImg.src = cv_canvas.toDataURL('image/jpeg', 0.8);
+            maskImg.classList.remove('hidden');
+            
+            document.getElementById('result-card').classList.remove('hidden');
+            
+            lastResult = {
+                id: sampleId,
+                area: leafArea,
+                coverage: coverage,
+                width: widthCm,
+                height: heightCm,
+                date: new Date().toISOString(),
+                thumb: createThumb(currentImg)
+            };
+            
+            showLoading(false);
+            showToast('✓ Analisi completata');
+        }, 100);
+    }
+
+    function createThumb(img) {
+        var size = 100;
+        cv2_canvas.width = size;
+        cv2_canvas.height = size;
+        
+        var scale = Math.max(size / img.width, size / img.height);
+        var x = (size - img.width * scale) / 2;
+        var y = (size - img.height * scale) / 2;
+        
+        cv2_ctx.fillStyle = '#eee';
+        cv2_ctx.fillRect(0, 0, size, size);
+        cv2_ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+        
+        return cv2_canvas.toDataURL('image/jpeg', 0.5);
+    }
+
+    // ========== SAVE/LOAD ==========
+    function saveResult() {
+        if (!lastResult) return;
+        
+        try {
+            var hist = JSON.parse(localStorage.getItem('leafarea_hist') || '[]');
+            hist.unshift(lastResult);
+            if (hist.length > 50) hist.pop();
+            localStorage.setItem('leafarea_hist', JSON.stringify(hist));
+            showToast('✓ Salvato!');
+            lastResult = null;
+        } catch (e) {
+            showToast('❌ Errore salvataggio');
+        }
+    }
+
+    function saveCalibration() {
+        try {
+            localStorage.setItem('leafarea_hsv', JSON.stringify(hsv));
+            showToast('✓ Calibrazione salvata!');
+        } catch (e) {
+            showToast('❌ Errore salvataggio');
+        }
+    }
+
+    function loadCalibration() {
+        try {
+            var saved = localStorage.getItem('leafarea_hsv');
+            if (saved) {
+                hsv = JSON.parse(saved);
+                syncSliders();
+                updateHSV();
+            }
+        } catch (e) {}
+    }
+
+    // ========== HISTORY ==========
+    function renderHistory() {
+        var hist = [];
+        try {
+            hist = JSON.parse(localStorage.getItem('leafarea_hist') || '[]');
+        } catch (e) {}
+        
+        var container = document.getElementById('history-list');
+        var exportRow = document.getElementById('export-row');
+        
+        if (hist.length === 0) {
+            container.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Nessuna misurazione</p></div>';
+            exportRow.classList.add('hidden');
+            return;
+        }
+        
+        exportRow.classList.remove('hidden');
+        
+        var html = '';
+        for (var i = 0; i < hist.length; i++) {
+            var item = hist[i];
+            var d = new Date(item.date);
+            var dateStr = d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+            
+            html += '<div class="history-item">';
+            html += '<img class="history-thumb" src="' + (item.thumb || '') + '">';
+            html += '<div class="history-info">';
+            html += '<div class="history-id">' + item.id + '</div>';
+            html += '<div class="history-area">' + item.area.toFixed(2).replace('.', ',') + ' cm²</div>';
+            html += '<div class="history-date">' + dateStr + '</div>';
+            html += '</div>';
+            html += '<button type="button" class="history-del" data-idx="' + i + '">×</button>';
+            html += '</div>';
+        }
+        
+        container.innerHTML = html;
+        
+        var delBtns = container.querySelectorAll('.history-del');
+        for (var j = 0; j < delBtns.length; j++) {
+            delBtns[j].addEventListener('click', function() {
+                var idx = parseInt(this.getAttribute('data-idx'));
+                deleteItem(idx);
+            });
+        }
+    }
+
+    function deleteItem(idx) {
+        if (!confirm('Eliminare?')) return;
+        try {
+            var hist = JSON.parse(localStorage.getItem('leafarea_hist') || '[]');
+            hist.splice(idx, 1);
+            localStorage.setItem('leafarea_hist', JSON.stringify(hist));
+            renderHistory();
+        } catch (e) {}
+    }
+
+    function clearHistory() {
+        if (!confirm('Eliminare tutto lo storico?')) return;
+        localStorage.removeItem('leafarea_hist');
+        renderHistory();
+    }
+
+    function exportCSV() {
+        try {
+            var hist = JSON.parse(localStorage.getItem('leafarea_hist') || '[]');
+            if (hist.length === 0) return;
+            
+            var csv = 'ID;Area_cm2;Copertura_%;Larghezza;Altezza;Data\n';
+            for (var i = 0; i < hist.length; i++) {
+                var h = hist[i];
+                csv += h.id + ';' + h.area.toFixed(2) + ';' + h.coverage.toFixed(2) + ';';
+                csv += h.width + ';' + h.height + ';' + new Date(h.date).toLocaleString('it-IT') + '\n';
+            }
+            
+            var blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'leafarea_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✓ CSV esportato');
+        } catch (e) {
+            showToast('❌ Errore export');
+        }
+    }
+
+    // ========== CALIBRATE FILE INPUT ==========
+    document.getElementById('calib-file-input').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            calibImg = new Image();
+            calibImg.onload = function() {
+                document.getElementById('calib-preview').src = calibImg.src;
+                document.getElementById('calib-preview-area').classList.add('visible');
+                
+                document.getElementById('calib-preview').onclick = function(e) {
+                    pickCalibColor(e);
+                };
+                
+                updateCalibPreview();
+            };
+            calibImg.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function pickCalibColor(e) {
+        if (!calibImg) return;
+        
+        var rect = e.target.getBoundingClientRect();
+        var scaleX = calibImg.width / rect.width;
+        var scaleY = calibImg.height / rect.height;
+        var x = Math.floor((e.clientX - rect.left) * scaleX);
+        var y = Math.floor((e.clientY - rect.top) * scaleY);
+        
+        cv_canvas.width = calibImg.width;
+        cv_canvas.height = calibImg.height;
+        cv_ctx.drawImage(calibImg, 0, 0);
+        
+        var pixel = cv_ctx.getImageData(x, y, 1, 1).data;
+        var hsvPick = rgbToHsv(pixel[0], pixel[1], pixel[2]);
+        
+        hsv.lh = Math.max(0, hsvPick.h - 15);
+        hsv.ls = Math.max(0, hsvPick.s - 60);
+        hsv.lv = Math.max(0, hsvPick.v - 60);
+        hsv.uh = Math.min(179, hsvPick.h + 15);
+        hsv.us = Math.min(255, hsvPick.s + 60);
+        hsv.uv = Math.min(255, hsvPick.v + 60);
+        
+        syncSliders();
+        updateHSV();
+        showToast('🎯 Colore campionato');
+    }
+
+    // ========== INIT ==========
+    document.getElementById('tab-measure').addEventListener('click', function() { showTab('measure'); });
+    document.getElementById('tab-calibrate').addEventListener('click', function() { showTab('calibrate'); });
+    document.getElementById('tab-history').addEventListener('click', function() { showTab('history'); });
+
+    document.getElementById('btn-camera').addEventListener('click', function(e) { 
+        // Prova ad aprire lo scanner avanzato
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && location.protocol !== 'content:') {
+            e.preventDefault();
+            openScanner();
+        } else {
+            // Fallback: usa l'input file con capture
+            document.getElementById('inp-camera').click();
+        }
+    });
+    document.getElementById('inp-camera').addEventListener('change', function(e) { 
+        var file = e.target.files[0];
+        if (file) {
+            loadFromGalleryWithCrop(file);
+        }
+    });
+    document.getElementById('inp-gallery').addEventListener('change', function(e) { loadFromGallery(e.target.files[0]); });
+    document.getElementById('btn-clear-img').addEventListener('click', function() { clearImage(); });
+    document.getElementById('btn-analyze').addEventListener('click', function() { analyzeImage(); });
+    document.getElementById('btn-save-result').addEventListener('click', function() { saveResult(); });
+    document.getElementById('btn-save-calib').addEventListener('click', function() { saveCalibration(); });
+    document.getElementById('btn-export').addEventListener('click', function() { exportCSV(); });
+    document.getElementById('btn-clear').addEventListener('click', function() { clearHistory(); });
+
+    // Scanner controls
+    document.getElementById('scanner-close').addEventListener('click', function() { closeScanner(); });
+    document.getElementById('scanner-flash').addEventListener('click', function() { toggleFlash(); });
+    document.getElementById('scanner-capture').addEventListener('click', function() { captureImage(); });
+
+    // Crop controls
+    document.getElementById('crop-back').addEventListener('click', function() { 
+        closeCropModal(); 
+        // Solo se lo scanner era attivo, riaprilo
+        // Altrimenti torna semplicemente alla schermata principale
+    });
+    document.getElementById('crop-auto').addEventListener('click', function() { autoDetectCorners(); });
+    document.getElementById('crop-confirm').addEventListener('click', function() { applyPerspectiveTransform(); });
+
+    // Sliders
+    var sliders = ['sl-lh', 'sl-ls', 'sl-lv', 'sl-uh', 'sl-us', 'sl-uv'];
+    for (var i = 0; i < sliders.length; i++) {
+        document.getElementById(sliders[i]).addEventListener('input', function() { updateHSV(); });
+        document.getElementById(sliders[i]).addEventListener('change', function() { updateHSV(); });
+    }
+
+    loadCalibration();
+    updateHSV();
+    setupCornerDrag();
+    </script>
+</body>
+</html>
