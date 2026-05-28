@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#4ade80"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="VoiceField"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<title>VoiceField · RE-FARM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'JetBrains Mono',monospace;background:#0f1117;color:#e8e8e0;min-height:100vh;padding:16px}
+.tbl-wrap{overflow-x:auto;border-radius:8px}
+table{border-collapse:collapse;min-width:100%}
+th{font-size:11px;font-weight:600;color:#6b7280;padding:6px 10px;border:1px solid #2a2a35;text-align:center;letter-spacing:.07em;white-space:nowrap;background:#111118}
+th.th-locked{color:#374151;background:#0d0d14}
+td{border:1px solid #2a2a35;padding:0;text-align:center}
+td.locked{background:#0d0d14;color:#4b5563;font-size:12px;padding:5px 8px;white-space:nowrap;cursor:default}
+td.editable{cursor:pointer}
+td.editable input{background:transparent;border:none;outline:none;color:#e8e8e0;font-family:inherit;font-size:13px;width:100%;text-align:center;padding:7px 6px;min-width:52px}
+td.active{background:rgba(74,222,128,.15)!important;outline:2px solid #4ade80;outline-offset:-2px}
+td.filled{background:rgba(255,255,255,.04)}
+.btn{border:1px solid #374151;background:transparent;color:#9ca3af;border-radius:6px;padding:6px 12px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap}
+.btn:hover{background:#1a1a24;color:#e8e8e0}
+.btn-mic{width:70px;height:70px;border-radius:50%;font-size:28px;border:2px solid #374151;background:transparent;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;margin:0 auto}
+.btn-mic.on{border-color:#4ade80;background:rgba(74,222,128,.12);box-shadow:0 0 20px rgba(74,222,128,.2);animation:pulse 1.6s infinite}
+.sheet-title{font-size:12px;font-weight:600;margin-bottom:6px;letter-spacing:.1em}
+.indicator{background:#141420;border:1px solid #2a2a35;border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:11px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.upload-zone{border:2px dashed #2a2a35;border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:18px}
+.upload-zone:hover,.upload-zone.drag{border-color:#4ade80;background:rgba(74,222,128,.05)}
+.legend{display:flex;gap:12px;font-size:10px;color:#4b5563;margin-bottom:10px;align-items:center;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+#installBtn{display:none}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.fb{animation:fadeUp .2s ease}
+</style>
+</head>
+<body>
+<div style="max-width:100%;margin:0 auto">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:18px;font-weight:600">🌿 VoiceField</div>
+      <div style="font-size:10px;color:#4b5563;margin-top:2px">Data entry vocale · RE-FARM</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="installBtn" onclick="installApp()">⬇ Installa App</button>
+      <button class="btn" onclick="document.getElementById('xlsIn').click()">📂 Carica Excel</button>
+      <input type="file" id="xlsIn" accept=".xlsx,.xls" style="display:none" onchange="loadExcel(this)"/>
+      <button class="btn" id="btnCSV" style="display:none" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn" id="btnXLSX" style="display:none" onclick="exportXLSX()">⬇ Excel</button>
+      <button class="btn" id="btnClear" style="display:none;color:#f87171;border-color:#450a0a" onclick="clearData()">✕ Svuota</button>
+    </div>
+  </div>
+
+  <div class="upload-zone" id="uploadZone"
+       onclick="document.getElementById('xlsIn').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="onDrop(event)">
+    <div style="font-size:28px;margin-bottom:8px">📊</div>
+    <div style="font-size:13px;font-weight:600;color:#9ca3af">Carica un file Excel per definire lo schema</div>
+    <div style="font-size:11px;color:#4b5563;margin-top:6px">Prima riga = intestazioni · ogni foglio = un gruppo · celle pre-compilate = blocco automatico</div>
+    <div style="margin-top:12px">
+      <button class="btn" onclick="event.stopPropagation();useDefault()">Schema default (LG/TM)</button>
+    </div>
+  </div>
+
+  <div id="dataSection" style="display:none">
+
+    <div style="text-align:center;margin-bottom:18px">
+      <button class="btn-mic" id="micBtn" onclick="toggleListen()">🎤</button>
+      <div style="margin-top:8px;font-size:12px;color:#6b7280" id="listenLabel">Tocca per iniziare</div>
+      <div style="font-size:11px;color:#4b5563;font-style:italic;margin-top:4px;min-height:16px" id="lastHeard"></div>
+      <div style="font-size:13px;font-weight:600;min-height:20px;margin-top:4px" id="feedback" class="fb"></div>
+    </div>
+
+    <div class="indicator">
+      <span style="color:#6b7280">Cella:</span>
+      <span style="font-weight:700" id="iSheet">—</span>
+      <span style="color:#6b7280">riga <span id="iRow">1</span></span>
+      <span style="color:#fbbf24;font-weight:700">col <span id="iCol">—</span></span>
+      <span style="margin-left:auto;color:#374151;font-size:10px" id="cmdHint">"annulla" · "salta"</span>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#0d0d14;border:1px solid #2a2a35"></div><span>Pre-compilato (bloccato)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1a1a22;border:1px solid #2a2a35"></div><span>Editabile</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(74,222,128,.15);border:1px solid #4ade80"></div><span>Cella attiva</span></div>
+    </div>
+
+    <div id="tablesWrap"></div>
+
+    <div style="margin-top:16px;font-size:10px;color:#374151;text-align:center;line-height:1.9">
+      Richiede Chrome su Android o desktop · HTTPS necessario per il microfono
+    </div>
+  </div>
+</div>
+
+<script>
+let SHEETS=[];
+const GRP_COLORS=["#60a5fa","#f472b6","#34d399","#fb923c","#a78bfa","#f59e0b"];
+let act={s:0,r:0,c:0};
+let hist=[];
+let listening=false;
+let rec=null;
+let fbT=null;
+let deferredPrompt=null;
+
+// ── PWA install ────────────────────────────────────────────────
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("installBtn").style.display = "";
+});
+
+window.addEventListener("appinstalled", () => {
+  document.getElementById("installBtn").style.display = "none";
+  deferredPrompt = null;
+});
+
+function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+}
+
+// ── Service Worker ─────────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
+  });
+}
+
+// ── Parsing Excel ──────────────────────────────────────────────
+function loadExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const sheets = wb.SheetNames.map(n => parseSheet(wb.Sheets[n], n)).filter(Boolean);
+      if (!sheets.length) { showFb("Nessun foglio valido", true); return; }
+      applySheets(sheets);
+      input.value = "";
+    } catch(err) { showFb("Errore: "+err.message, true); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseSheet(ws, name) {
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+  if (!aoa.length) return null;
+  const nCols = Math.max(...aoa.map(r => (r||[]).length));
+  const nRows = aoa.length;
+  const matrix = Array.from({length:nRows}, (_, r) =>
+    Array.from({length:nCols}, (_, c) => (aoa[r]||[])[c] ?? null));
+  const merges = ws['!merges'] || [];
+  merges.forEach(m => {
+    const val = matrix[m.s.r]?.[m.s.c] ?? null;
+    for (let r=m.s.r; r<=m.e.r; r++)
+      for (let c=m.s.c; c<=m.e.c; c++)
+        if (matrix[r]) matrix[r][c] = val;
+  });
+  const header = matrix[0].map(v => v!==null ? String(v).trim() : '');
+  const headerSpan = [];
+  const mergedHeaderCols = new Set();
+  merges.filter(m => m.s.r===0).forEach(m => {
+    headerSpan.push({col:m.s.c, span:m.e.c-m.s.c+1, label:header[m.s.c]});
+    for (let c=m.s.c+1; c<=m.e.c; c++) mergedHeaderCols.add(c);
+  });
+  const dataRows = matrix.slice(1);
+  const isLocked = Array.from({length:nCols}, (_,ci) =>
+    dataRows.some(row => row[ci]!==null && String(row[ci]).trim()!==''));
+  const hasFixedRows = isLocked.some(Boolean);
+  const rows = hasFixedRows
+    ? dataRows.map(row => row.map((v,ci) => ({value:v!==null?String(v):'', locked:isLocked[ci]})))
+    : [header.map(() => ({value:'', locked:false}))];
+  return {name, header, headerSpan, mergedHeaderCols, isLocked, hasFixedRows, rows};
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById("uploadZone").classList.remove("drag");
+  loadExcel({files:e.dataTransfer.files});
+}
+
+function useDefault() {
+  const cols = ["N","Ø","L","P"];
+  applySheets(["LG","TM"].map(name => ({
+    name, header:cols, headerSpan:[], mergedHeaderCols:new Set(),
+    isLocked:[false,false,false,false], hasFixedRows:false,
+    rows:[cols.map(() => ({value:'',locked:false}))]
+  })));
+}
+
+function applySheets(sheets) {
+  SHEETS = sheets;
+  act = {s:0, r:0, c:firstEditable(0)};
+  hist = [];
+  document.getElementById("uploadZone").style.display = "none";
+  document.getElementById("dataSection").style.display = "block";
+  ["btnCSV","btnXLSX","btnClear"].forEach(id => document.getElementById(id).style.display = "");
+  const names = sheets.length>1 ? ' · '+sheets.map(s=>`"${s.name.toLowerCase()}"`).join(' · ') : '';
+  document.getElementById("cmdHint").textContent = '"annulla" · "salta"'+names;
+  buildTables();
+  renderAll();
+}
+
+// ── Navigazione ────────────────────────────────────────────────
+function firstEditable(si) { return SHEETS[si].isLocked.findIndex(l=>!l); }
+function nextEditable(si,ci) {
+  const locked = SHEETS[si].isLocked;
+  for (let c=ci+1; c<locked.length; c++) if (!locked[c]) return c;
+  return -1;
+}
+function advance() {
+  const sheet = SHEETS[act.s];
+  let nc = nextEditable(act.s, act.c);
+  if (nc !== -1) { act.c = nc; }
+  else {
+    let nr = act.r+1;
+    if (!sheet.hasFixedRows) {
+      if (nr >= sheet.rows.length)
+        sheet.rows.push(sheet.header.map(() => ({value:'',locked:false})));
+    } else {
+      if (nr >= sheet.rows.length) nr = sheet.rows.length-1;
+    }
+    act.r = nr; act.c = firstEditable(act.s);
+  }
+  renderAll();
+  const el = document.querySelector('td.active input') || document.querySelector('td.active');
+  if (el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// ── Rendering ──────────────────────────────────────────────────
+function buildTables() {
+  document.getElementById("tablesWrap").innerHTML = SHEETS.map((sh,si) =>
+    `<div style="margin-bottom:24px">
+      <div class="sheet-title" style="color:${GRP_COLORS[si%GRP_COLORS.length]}">${sh.name}</div>
+      <div class="tbl-wrap"><table id="tbl-${si}"></table></div>
+    </div>`).join("");
+}
+
+function renderSheet(si) {
+  const sh = SHEETS[si];
+  const t = document.getElementById("tbl-"+si);
+  if (!t) return;
+  const skip = sh.mergedHeaderCols;
+  let hRow = '<thead><tr>';
+  for (let ci=0; ci<sh.header.length; ci++) {
+    if (skip.has(ci)) continue;
+    const sp = sh.headerSpan.find(s=>s.col===ci);
+    const span = sp ? sp.span : 1;
+    const lbl = sh.header[ci]||'';
+    const locked = sh.isLocked[ci]||(sp && sh.isLocked.slice(ci,ci+span).every(Boolean));
+    hRow += `<th${span>1?` colspan="${span}"`:''} class="${locked?'th-locked':''}">${lbl}</th>`;
+  }
+  hRow += '</tr></thead>';
+  let body = '<tbody>';
+  sh.rows.forEach((row,ri) => {
+    body += '<tr>';
+    row.forEach((cell,ci) => {
+      if (cell.locked) {
+        body += `<td class="locked">${escH(cell.value)}</td>`;
+      } else {
+        const isAct = act.s===si && act.r===ri && act.c===ci;
+        const filled = !isAct && cell.value ? ' filled' : '';
+        body += `<td class="editable${isAct?' active':filled}" onclick="setAct(${si},${ri},${ci})">
+          <input value="${escH(cell.value)}" oninput="onEdit(${si},${ri},${ci},this.value)" onfocus="setAct(${si},${ri},${ci})"/>
+        </td>`;
+      }
+    });
+    body += '</tr>';
+  });
+  t.innerHTML = hRow + body + '</tbody>';
+  if (act.s===si) {
+    const inp = t.querySelector('td.active input');
+    if (inp && document.activeElement!==inp) inp.focus({preventScroll:true});
+  }
+}
+
+function renderAll() {
+  SHEETS.forEach((_,si) => renderSheet(si));
+  const sh = SHEETS[act.s];
+  const el = document.getElementById("iSheet");
+  if (el) { el.textContent=sh?sh.name:"—"; el.style.color=GRP_COLORS[act.s%GRP_COLORS.length]; }
+  setText("iRow", act.r+1);
+  setText("iCol", sh?(sh.header[act.c]||act.c+1):"—");
+}
+
+function setAct(si,ri,ci) {
+  if (SHEETS[si].rows[ri][ci].locked) return;
+  act={s:si,r:ri,c:ci}; renderAll();
+}
+function onEdit(si,ri,ci,v) { SHEETS[si].rows[ri][ci].value=v; }
+
+// ── Voice ──────────────────────────────────────────────────────
+function showFb(msg,err) {
+  const el=document.getElementById("feedback");
+  if(!el) return;
+  el.textContent=msg; el.style.color=err?"#f87171":"#4ade80";
+  clearTimeout(fbT); fbT=setTimeout(()=>el.textContent="",2500);
+}
+
+function commit(val) {
+  const cell=SHEETS[act.s].rows[act.r][act.c];
+  hist.push({s:act.s,r:act.r,c:act.c,prev:cell.value});
+  cell.value=val; advance();
+}
+
+function parseNum(txt) {
+  let s=txt.toLowerCase().replace(/virgola/g,".").replace(/,/g,".").replace(/[^0-9.]/g," ").trim();
+  const m=s.match(/\d+\.?\d*/);
+  return m?m[0]:null;
+}
+
+function setupRec() {
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return null;
+  const r=new SR();
+  r.lang="it-IT"; r.continuous=false; r.interimResults=false;
+  r.onresult=e=>{
+    const t=e.results[0][0].transcript.trim();
+    setText("lastHeard",`"${t}"`);
+    const lo=t.toLowerCase();
+    if(lo.includes("annulla")||lo.includes("cancella")){
+      if(hist.length>0){const h=hist.pop();SHEETS[h.s].rows[h.r][h.c].value=h.prev;act={s:h.s,r:h.r,c:h.c};showFb("↩ Annullato",true);renderAll();}
+      else showFb("Niente da annullare",true);
+    } else if(lo.includes("salta")||lo.includes("vuoto")){commit("");showFb("⏭ Saltato");}
+    else {
+      const si=SHEETS.findIndex(sh=>lo===sh.name.toLowerCase()||lo===sh.name.toLowerCase().split("").join(" "));
+      if(si!==-1){act={s:si,r:0,c:firstEditable(si)};renderAll();showFb("→ "+SHEETS[si].name);}
+      else{const n=parseNum(t);if(n!==null){commit(n);showFb("✓ "+n);}else showFb(`? "${t}"`,true);}
+    }
+    if(listening) setTimeout(()=>{try{r.start();}catch(e){}},300);
+  };
+  r.onerror=e=>{if(e.error!=="no-speech"&&e.error!=="aborted"){showFb("Errore: "+e.error,true);setListenUI(false);listening=false;}};
+  r.onend=()=>{if(listening) try{r.start();}catch(e){}};
+  return r;
+}
+
+function setListenUI(on){
+  document.getElementById("micBtn").className="btn-mic"+(on?" on":"");
+  document.getElementById("listenLabel").textContent=on?"● IN ASCOLTO...":"Tocca per iniziare";
+}
+
+function toggleListen(){
+  if(!rec) rec=setupRec();
+  if(!rec){alert("Web Speech API non supportata.\nUsa Chrome su Android o desktop.");return;}
+  if(listening){rec.stop();listening=false;setListenUI(false);}
+  else{rec.start();listening=true;setListenUI(true);}
+}
+
+// ── Export ─────────────────────────────────────────────────────
+function exportCSV(){
+  const lines=[];
+  SHEETS.forEach(sh=>{
+    lines.push("# "+sh.name);
+    lines.push(sh.header.join(","));
+    sh.rows.forEach(row=>{if(row.some(c=>c.value!==''))lines.push(row.map(c=>c.value).join(","));});
+    lines.push("");
+  });
+  dl(lines.join("\n"),"misurazioni_"+today()+".csv","text/csv");
+}
+
+function exportXLSX(){
+  const wb=XLSX.utils.book_new();
+  SHEETS.forEach(sh=>{
+    const rows=[sh.header,...sh.rows.map(row=>row.map(c=>c.value))];
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),sh.name);
+  });
+  XLSX.writeFile(wb,"misurazioni_"+today()+".xlsx");
+}
+
+function clearData(){
+  if(!confirm("Svuotare i dati editabili? Le celle bloccate rimangono.")) return;
+  SHEETS.forEach(sh=>sh.rows.forEach(row=>row.forEach(cell=>{if(!cell.locked)cell.value='';})));
+  act={s:0,r:0,c:firstEditable(0)};hist=[];renderAll();
+}
+
+function escH(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");}
+function setText(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+function today(){return new Date().toISOString().slice(0,10);}
+function dl(content,filename,mime){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=filename;a.click();
+}
+</script>
+</body>
+</html>
